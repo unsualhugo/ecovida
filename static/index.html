@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14513B">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>EcoVida Local</title>
+<style>
+:root{--bg:#F6F7F4;--ink:#1B1F1C;--mut:#4A524C;--verde:#14513B;--linha:#8A948C;--card:#fff;--erro-bg:#FDE8E6;--erro:#8A1C12}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--verde);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+header h1{font-size:1.15rem;margin:0}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h2{font-size:1.4rem;margin:0 0 16px}
+label{display:block;font-weight:600;margin:16px 0 6px}
+input,select{width:100%;min-height:48px;padding:10px 12px;font:inherit;border:2px solid var(--linha);border-radius:8px;background:#fff;color:var(--ink)}
+button{min-height:48px;min-width:48px;padding:10px 18px;font:inherit;font-weight:700;border-radius:8px;border:2px solid var(--verde);cursor:pointer}
+.pri{background:var(--verde);color:#fff;width:100%;margin-top:22px}
+.sec{background:#fff;color:var(--verde)}
+header .sec{border-color:#fff;background:transparent;color:#fff}
+:focus-visible{outline:4px solid #0A4FA3;outline-offset:2px}
+.link{background:none;border:0;color:var(--verde);text-decoration:underline;width:100%;margin-top:8px}
+.msg{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:8px;margin:16px 0;font-weight:600}
+.msg[hidden]{display:none}
+.msg.erro{background:var(--erro-bg);color:var(--erro);border:2px solid var(--erro)}
+.msg.ok{background:#DDF0E6;color:var(--verde);border:2px solid var(--verde)}
+.card{background:var(--card);border:2px solid #CBD2CC;border-radius:10px;padding:14px;margin:0 0 14px}
+.card h3{margin:0 0 4px;font-size:1.1rem}
+.card p{margin:2px 0;color:var(--mut)}
+.badge{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:999px;font-weight:700;font-size:.95rem;margin:8px 0}
+.s-pendente{background:#FFF1CC;color:#6B4200}.s-agendada{background:#DCEBF7;color:#0B4F7A}.s-coletada{background:#DDF0E6;color:var(--verde)}
+.acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}.acoes button{flex:1 1 140px}
+.resumo{color:var(--mut);margin:0 0 16px}
+@media (prefers-reduced-motion:no-preference){button{transition:background .15s}}
+</style>
+</head>
+<body>
+<header><h1>EcoVida Local</h1><button id="sair" class="sec" hidden>Sair</button></header>
+<main>
+<p id="msg" class="msg" role="alert" hidden></p>
+
+<section id="t1" aria-labelledby="h-login">
+  <h2 id="h-login">Entrar</h2>
+  <div id="campo-nome" hidden><label for="nome">Nome completo</label><input id="nome" autocomplete="name"></div>
+  <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" inputmode="email">
+  <label for="senha">Senha (mínimo 8 caracteres)</label><input id="senha" type="password" autocomplete="current-password">
+  <button id="entrar" class="pri">Entrar</button>
+  <button id="alterna" class="link">Primeiro acesso? Criar cadastro</button>
+</section>
+
+<section id="t2" aria-labelledby="h-sol" hidden>
+  <h2 id="h-sol">Pedir coleta</h2>
+  <label for="material">Tipo de material</label>
+  <select id="material"><option>papel</option><option>plástico</option><option>vidro</option><option>metal</option><option>outro</option></select>
+  <label for="kg">Volume aproximado (kg)</label><input id="kg" type="number" min="0.1" step="0.1" inputmode="decimal">
+  <label for="end">Endereço para coleta</label><input id="end" autocomplete="street-address">
+  <button id="enviar" class="pri">Enviar pedido</button>
+  <h2 style="margin-top:32px">Meus pedidos</h2><div id="meus"></div>
+</section>
+
+<section id="t3" aria-labelledby="h-pan" hidden>
+  <h2 id="h-pan">Solicitações de coleta</h2>
+  <p id="resumo" class="resumo"></p>
+  <div id="cards"></div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let modoCadastro=false, S=JSON.parse(sessionStorage.getItem('ev')||'null');
+const ICO={erro:'⚠️',ok:'✅'};
+const ST={pendente:['⏳','Pendente'],agendada:['📅','Agendada'],coletada:['✅','Coletada']};
+function aviso(t,tipo='erro'){const m=$('msg');m.className='msg '+tipo;m.innerHTML='';
+  const i=document.createElement('span');i.setAttribute('aria-hidden','true');i.textContent=ICO[tipo];
+  const x=document.createElement('span');x.textContent=(tipo==='erro'?'Erro: ':'Pronto: ')+t;m.append(i,x);m.hidden=false;}
+function limpa(){$('msg').hidden=true}
+async function api(p,o={}){
+  let r;try{r=await fetch('/api'+p,{...o,headers:{'Content-Type':'application/json',...(S?{Authorization:'Bearer '+S.token}:{})},body:o.body&&JSON.stringify(o.body)});}catch(e){throw new Error('sem conexão com o servidor. Confira se ele está ligado e se a página foi aberta pelo endereço dele.')}
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){if(r.status===401&&S&&p!=='/login'){sair();}
+    const det=Array.isArray(d.detail)?'Confira os campos preenchidos.':d.detail;throw new Error(det||'Não foi possível concluir. Tente de novo.')}
+  return d;}
+function tela(n){['t1','t2','t3'].forEach(t=>$(t).hidden=t!=='t'+n);$('sair').hidden=n===1;
+  const h=$({1:'h-login',2:'h-sol',3:'h-pan'}[n]);h.tabIndex=-1;h.focus();}
+function entrou(d){S=d;sessionStorage.setItem('ev',JSON.stringify(d));limpa();
+  if(d.perfil==='coordenadora'){tela(3);painel();}else{tela(2);meus();}}
+function sair(){S=null;sessionStorage.removeItem('ev');tela(1);}
+$('sair').onclick=sair;
+$('alterna').onclick=()=>{modoCadastro=!modoCadastro;$('campo-nome').hidden=!modoCadastro;
+  $('h-login').textContent=modoCadastro?'Criar cadastro':'Entrar';$('entrar').textContent=modoCadastro?'Criar cadastro':'Entrar';
+  $('alterna').textContent=modoCadastro?'Já tenho cadastro. Entrar':'Primeiro acesso? Criar cadastro';limpa();};
+$('entrar').onclick=async()=>{limpa();
+  const b={email:$('email').value.trim(),senha:$('senha').value};
+  if(!b.email||!b.senha)return aviso('preencha e-mail e senha.');
+  try{if(modoCadastro){b.nome=$('nome').value.trim();if(b.nome.length<2)return aviso('preencha seu nome completo.');}
+    entrou(await api(modoCadastro?'/cadastro':'/login',{method:'POST',body:b}));}catch(e){aviso(e.message)}};
+$('enviar').onclick=async()=>{limpa();
+  const kg=parseFloat($('kg').value),end=$('end').value.trim();
+  if(!(kg>0))return aviso('informe o volume em kg, maior que zero.');
+  if(end.length<5)return aviso('informe o endereço completo para a coleta.');
+  try{await api('/coletas',{method:'POST',body:{material:$('material').value,volume_kg:kg,endereco:end}});
+    $('kg').value='';$('end').value='';aviso('pedido enviado. A coordenação vai agendar a coleta.','ok');meus();}catch(e){aviso(e.message)}};
+function badge(s){const [i,t]=ST[s];return `<span class="badge s-${s}"><span aria-hidden="true">${i}</span>${t}</span>`}
+function el(c,html){const d=document.createElement('article');d.className='card';d.innerHTML=html;return d}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function meus(){try{const l=await api('/coletas');const box=$('meus');box.innerHTML='';
+  if(!l.length)box.textContent='Você ainda não fez nenhum pedido.';
+  l.forEach(c=>box.append(el('',`<h3>${esc(c.material)} · ${c.volume_kg} kg</h3><p>${esc(c.endereco)}</p>${badge(c.status)}`)));}catch(e){aviso(e.message)}}
+async function painel(){try{const l=await api('/coletas');const box=$('cards');box.innerHTML='';
+  const n=l.filter(c=>c.status==='pendente').length;
+  $('resumo').textContent=l.length?`${n} pendente(s) de ${l.length} solicitação(ões).`:'Nenhuma solicitação por enquanto.';
+  l.forEach(c=>{const d=el('',`<h3>${esc(c.material)} · ${c.volume_kg} kg</h3><p>${esc(c.endereco)}</p><div data-b>${badge(c.status)}</div><div class="acoes"></div>`);
+    const a=d.querySelector('.acoes');
+    [['agendada','Agendar coleta'],['coletada','Marcar como coletada']].forEach(([s,t])=>{
+      const b=document.createElement('button');b.className='sec';b.textContent=t;b.disabled=c.status===s;
+      b.onclick=async()=>{limpa();b.disabled=true;try{const r=await api(`/coletas/${c.id}/status`,{method:'PATCH',body:{status:s}});
+        c.status=r.status;d.querySelector('[data-b]').innerHTML=badge(r.status);
+        a.querySelectorAll('button').forEach((x,i)=>x.disabled=['agendada','coletada'][i]===r.status);
+        aviso(`pedido de ${c.material} marcado como ${ST[s][1].toLowerCase()}.`,'ok');}catch(e){b.disabled=false;aviso(e.message)}};
+      a.append(b);});box.append(d);});}catch(e){aviso(e.message)}}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');
+if(S)entrou(S);else tela(1);
+</script>
+</body>
+</html>
