@@ -29,3 +29,6 @@ def test_validacao_e_seguranca():
         t = c.post("/api/login", json={"email": "maria@ecovida.org", "senha": "maria12345"}).json()["token"]
         assert c.post("/api/coletas", json={**COLETA, "volume_kg": -1}, headers=auth(t)).status_code == 422
         assert c.post("/api/coletas", json={**COLETA, "material": "lixo"}, headers=auth(t)).status_code == 422
+def test_saude():
+    with TestClient(main.app) as c:
+        assert c.get("/api/saude").json() == {"status": "ok"}pytest
