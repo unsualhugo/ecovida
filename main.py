@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from sqlalchemy import create_engine, String, Integer, Float, ForeignKey, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 
-SECRET = os.environ.get("JWT_SECRET", "dev-apenas-para-teste-local")
+SECRET = os.environ.get("JWT_SECRET", "chave-local-de-teste-ecovida-2026-xyz")
 engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:///ecovida.db"), pool_pre_ping=True)
 SessionLocal = sessionmaker(engine)
 
